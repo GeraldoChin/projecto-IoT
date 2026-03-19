@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IoT Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --green: #10b981;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --temp: #f97316;
+    --hum: #3b82f6;
+    --pres: #8b5cf6;
+    --luz: #fbbf24;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid de fundo ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(17,24,39,0.9);
+    backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px; }
+  .logo h1 span { color: var(--accent); }
+
+  .status-badge {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 999px;
+    font-size: 0.8rem; font-weight: 500;
+    color: var(--green);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  /* ── Main layout ── */
+  main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+
+  /* ── Stat cards topo ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.5rem;
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .stat-card.temp::before { background: var(--temp); }
+  .stat-card.hum::before  { background: var(--hum); }
+  .stat-card.pres::before { background: var(--pres); }
+  .stat-card.luz::before  { background: var(--luz); }
+
+  .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .stat-value { font-size: 2rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin: 4px 0; }
+  .stat-value.temp { color: var(--temp); }
+  .stat-value.hum  { color: var(--hum); }
+  .stat-value.pres { color: var(--pres); }
+  .stat-value.luz  { color: var(--luz); }
+  .stat-sub { font-size: 0.8rem; color: var(--muted); }
+
+  /* ── Gráfico de barras ── */
+  .section-title {
+    font-size: 0.85rem; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--muted);
+    margin-bottom: 1rem; display: flex; align-items: center; gap: 10px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .chart-area {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;
+  }
+  .chart-bars {
+    display: flex; align-items: flex-end; gap: 4px;
+    height: 120px; margin-top: 1rem;
+  }
+  .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bar {
+    width: 100%; border-radius: 4px 4px 0 0;
+    min-height: 2px;
+    transition: height 0.4s ease;
+  }
+  .bar-val { font-size: 0.6rem; color: var(--muted); font-family: 'JetBrains Mono'; }
+
+  /* ── Tabela de leituras ── */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-bottom: 2rem;
+  }
+  .table-header {
+    padding: 1rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .table-header h3 { font-size: 0.9rem; font-weight: 600; }
+  .total-badge {
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.2);
+    color: var(--accent);
+    font-size: 0.75rem; padding: 3px 10px; border-radius: 999px;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; padding: 0.7rem 1.5rem;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); font-weight: 500;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.01);
+  }
+  td {
+    padding: 0.7rem 1.5rem;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .tipo-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 0.75rem;
+  }
+  .tipo-temperatura { background: rgba(249,115,22,0.15); color: var(--temp); }
+  .tipo-humidade    { background: rgba(59,130,246,0.15); color: var(--hum); }
+  .tipo-pressao     { background: rgba(139,92,246,0.15); color: var(--pres); }
+  .tipo-luz         { background: rgba(251,191,36,0.15); color: var(--luz); }
+
+  .alerta-normal { color: var(--green); }
+  .alerta-alto   { color: var(--red); font-weight: 700; }
+  .alerta-baixo  { color: var(--yellow); font-weight: 700; }
+
+  /* ── Botões ── */
+  .actions { display: flex; gap: 0.75rem; margin-bottom: 2rem; flex-wrap: wrap; }
+  button {
+    padding: 8px 18px; border-radius: 8px; border: none;
+    font-family: 'Space Grotesk'; font-size: 0.85rem; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent); color: #000;
+  }
+  .btn-primary:hover { background: #00b8d9; transform: translateY(-1px); }
+  .btn-danger {
+    background: rgba(239,68,68,0.1); color: var(--red);
+    border: 1px solid rgba(239,68,68,0.3);
+  }
+  .btn-danger:hover { background: rgba(239,68,68,0.2); }
+  .btn-secondary {
+    background: rgba(255,255,255,0.05); color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+  .empty-state {
+    text-align: center; padding: 3rem;
+    color: var(--muted); font-size: 0.9rem;
+  }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+  /* ── Filtros ── */
+  .filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .filter-btn {
+    padding: 5px 14px; border-radius: 6px; font-size: 0.8rem;
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+  }
+  .filter-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.08); }
+  .filter-btn:hover { color: var(--text); }
+
+  /* ── Auto-refresh info ── */
+  .refresh-info {
+    font-size: 0.75rem; color: var(--muted);
+    text-align: right; margin-bottom: 0.5rem;
+  }
+
+  /* ── Stats box ── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  .stats-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.2rem 1.5rem;
+  }
+  .stats-box h4 { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.8rem; }
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.82rem;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .val { font-family: 'JetBrains Mono'; color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <h1>IoT <span>Dashboard</span></h1>
+  </div>
+  <div class="status-badge">
+    <div class="status-dot"></div>
+    Servidor Ativo
+  </div>
+</header>
+
+<main>
+  <div class="refresh-info">Atualização automática a cada <strong>3s</strong> &nbsp;·&nbsp; 💾 Total na BD: <strong id="total-db">—</strong> registos</div>
+
+  <!-- Cards de leitura mais recente -->
+  <div class="stat-grid" id="stat-cards">
+    <div class="stat-card temp">
+      <div class="stat-label">🌡️ Temperatura</div>
+      <div class="stat-value temp" id="val-temperatura">—</div>
+      <div class="stat-sub" id="sub-temperatura">Aguardando dados...</div>
+    </div>
+    <div class="stat-card hum">
+      <div class="stat-label">💧 Humidade</div>
+      <div class="stat-value hum" id="val-humidade">—</div>
+      <div class="stat-sub" id="sub-humidade">Aguardando dados...</div>
+    </div>
+    <div class="stat-card pres">
+      <div class="stat-label">🌬️ Pressão</div>
+      <div class="stat-value pres" id="val-pressao">—</div>
+      <div class="stat-sub" id="sub-pressao">Aguardando dados...</div>
+    </div>
+    <div class="stat-card luz">
+      <div class="stat-label">☀️ Luminosidade</div>
+      <div class="stat-value luz" id="val-luz">—</div>
+      <div class="stat-sub" id="sub-luz">Aguardando dados...</div>
+    </div>
+  </div>
+
+  <!-- Gráfico barras -->
+  <div class="section-title">Histórico Visual (últimas leituras)</div>
+  <div class="chart-area">
+    <div class="filters">
+      <button class="filter-btn active" onclick="setChartTipo('temperatura', this)">🌡️ Temperatura</button>
+      <button class="filter-btn" onclick="setChartTipo('humidade', this)">💧 Humidade</button>
+      <button class="filter-btn" onclick="setChartTipo('pressao', this)">🌬️ Pressão</button>
+      <button class="filter-btn" onclick="setChartTipo('luz', this)">☀️ Luz</button>
+    </div>
+    <div class="chart-bars" id="chart-bars"></div>
+  </div>
+
+  <!-- Estatísticas -->
+  <div class="section-title">Estatísticas por Sensor</div>
+  <div class="stats-grid" id="stats-grid"></div>
+
+  <!-- Ações -->
+  <div class="section-title">Leituras Recentes</div>
+  <div class="actions">
+    <button class="btn-primary" onclick="fetchDados()">🔄 Atualizar Agora</button>
+    <button class="btn-danger" onclick="limparDados()">🗑️ Limpar Dados</button>
+  </div>
+
+  <!-- Tabela -->
+  <div class="table-wrap">
+    <div class="table-header">
+      <h3>Leituras dos Sensores</h3>
+      <span class="total-badge" id="total-badge">0 registos</span>
+    </div>
+    <div id="tabela-container">
+      <div class="empty-state">
+        <div class="icon">📡</div>
+        <p>A aguardar dados dos sensores...</p>
+        <p style="margin-top:8px; font-size:0.8rem;">Inicia o <code>sensor.py</code> para começar.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const CORES = {
+  temperatura: '#f97316', humidade: '#3b82f6',
+  pressao: '#8b5cf6', luz: '#fbbf24'
+};
+const UNIDADES = {
+  temperatura: '°C', humidade: '%', pressao: ' hPa', luz: ' lux'
+};
+let chartTipo = 'temperatura';
+let allDados = [];
+
+function setChartTipo(tipo, btn) {
+  chartTipo = tipo;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderChart();
+}
+
+async function fetchDados() {
+  try {
+    const res = await fetch('/dados?ultimos=50');
+    allDados = await res.json();
+    renderTable(allDados);
+    updateCards(allDados);
+    renderChart();
+  } catch(e) { console.error(e); }
+}
+
+async function fetchStats() {
+  try {
+    const res = await fetch('/estatisticas');
+    const stats = await res.json();
+    renderStats(stats);
+  } catch(e) {}
+}
+
+function updateCards(dados) {
+  const tipos = ['temperatura', 'humidade', 'pressao', 'luz'];
+  tipos.forEach(tipo => {
+    const recentes = dados.filter(d => d.tipo === tipo);
+    if (recentes.length === 0) return;
+    const ultimo = recentes[recentes.length - 1];
+    document.getElementById(`val-${tipo}`).textContent = ultimo.valor + (UNIDADES[tipo] || '');
+    const alertaTxt = ultimo.alerta !== 'normal' ? ` ⚠️ ${ultimo.alerta}` : '';
+    document.getElementById(`sub-${tipo}`).textContent = `${ultimo.sensor_id} · ${ultimo.local} · ${ultimo.timestamp}${alertaTxt}`;
+  });
+}
+
+function renderChart() {
+  const dados = allDados.filter(d => d.tipo === chartTipo).slice(-30);
+  const container = document.getElementById('chart-bars');
+  if (dados.length === 0) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;margin:auto">Sem dados para este tipo</div>';
+    return;
+  }
+  const vals = dados.map(d => d.valor);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const cor = CORES[chartTipo] || '#00d4ff';
+  const unidade = UNIDADES[chartTipo] || '';
+
+  container.innerHTML = dados.map(d => {
+    const pct = Math.max(5, ((d.valor - min) / range) * 100);
+    const alertaColor = d.alerta === 'alto' ? '#ef4444' : d.alerta === 'baixo' ? '#f59e0b' : cor;
+    return `<div class="bar-wrap">
+      <div class="bar-val">${d.valor}</div>
+      <div class="bar" style="height:${pct}%; background:${alertaColor}; opacity:0.85"></div>
+    </div>`;
+  }).join('');
+}
+
+function renderStats(stats) {
+  const container = document.getElementById('stats-grid');
+  if (!stats || Object.keys(stats).length === 0) { container.innerHTML = ''; return; }
+  const icones = {temperatura:'🌡️',humidade:'💧',pressao:'🌬️',luz:'☀️'};
+  container.innerHTML = Object.entries(stats).map(([tipo, s]) => `
+    <div class="stats-box">
+      <h4>${icones[tipo]||'📡'} ${tipo.charAt(0).toUpperCase()+tipo.slice(1)}</h4>
+      <div class="stat-row"><span>Leituras</span><span class="val">${s.total_leituras}</span></div>
+      <div class="stat-row"><span>Média</span><span class="val">${s.media}${s.unidade}</span></div>
+      <div class="stat-row"><span>Mínimo</span><span class="val">${s.minimo}${s.unidade}</span></div>
+      <div class="stat-row"><span>Máximo</span><span class="val">${s.maximo}${s.unidade}</span></div>
+      <div class="stat-row"><span>Desvio Padrão</span><span class="val">${s.desvio_padrao}${s.unidade}</span></div>
+      <div class="stat-row"><span>Alertas</span><span class="val" style="color:${s.total_alertas>0?'var(--red)':'var(--green)'}">${s.total_alertas}</span></div>
+    </div>
+  `).join('');
+}
+
+function renderTable(dados) {
+  const recentes = [...dados].reverse().slice(0, 30);
+  document.getElementById('total-badge').textContent = dados.length + ' registos';
+
+  if (dados.length === 0) {
+    document.getElementById('tabela-container').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📡</div>
+        <p>A aguardar dados dos sensores...</p>
+        <p style="margin-top:8px; font-size:0.8rem;">Inicia o <code>sensor.py</code> para começar.</p>
+      </div>`;
+    return;
+  }
+
+  const icones = {temperatura:'🌡️',humidade:'💧',pressao:'🌬️',luz:'☀️'};
+  const rows = recentes.map(d => {
+    const alertaClass = `alerta-${d.alerta}`;
+    const alertaTxt = d.alerta === 'normal' ? '✓ normal' : `⚠️ ${d.alerta}`;
+    return `<tr>
+      <td>${d.timestamp}</td>
+      <td>${d.sensor_id}</td>
+      <td><span class="tipo-badge tipo-${d.tipo}">${icones[d.tipo]||'📡'} ${d.tipo}</span></td>
+      <td>${d.valor}${d.unidade}</td>
+      <td>${d.local}</td>
+      <td class="${alertaClass}">${alertaTxt}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tabela-container').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Hora</th><th>Sensor ID</th><th>Tipo</th>
+        <th>Valor</th><th>Local</th><th>Estado</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+async function limparDados() {
+  if (!confirm('Tens a certeza que queres limpar todos os dados?')) return;
+  await fetch('/dados', { method: 'DELETE' });
+  allDados = [];
+  renderTable([]);
+  renderStats({});
+  document.querySelectorAll('[id^="val-"]').forEach(el => el.textContent = '—');
+  document.querySelectorAll('[id^="sub-"]').forEach(el => el.textContent = 'Aguardando dados...');
+  document.getElementById('chart-bars').innerHTML = '';
+}
+
+async function fetchTotal() {
+  try {
+    const res = await fetch('/total');
+    const data = await res.json();
+    document.getElementById('total-db').textContent = data.total;
+  } catch(e) {}
+}
+
+// Auto-refresh
+fetchDados();
+fetchStats();
+fetchTotal();
+setInterval(() => { fetchDados(); fetchStats(); fetchTotal(); }, 3000);
+</script>
+</body>
+</html>
