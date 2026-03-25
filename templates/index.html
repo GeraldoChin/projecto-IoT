@@ -1,82 +1,116 @@
 <!doctype html>
 <html lang="pt">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Temperatura IoT</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        max-width: 400px;
-        margin: 60px auto;
-        padding: 0 20px;
-      }
+<head>
+  <meta charset="UTF-8" />
+  <title>IoT Irrigação Inteligente</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-      h1 {
-        font-size: 1.2rem;
-        margin-bottom: 30px;
-      }
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+    }
 
-      .atual {
-        font-size: 3rem;
-        font-weight: bold;
-        margin-bottom: 6px;
-      }
-      .hora {
-        color: gray;
-        font-size: 0.9rem;
-        margin-bottom: 20px;
-      }
+    h1 { text-align: center; }
 
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 8px;
-        border-bottom: 1px solid #ddd;
-      }
-      th {
-        font-size: 0.85rem;
-        color: gray;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>🌡️ Sensor de Temperatura</h1>
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
 
-    <div class="atual" id="valor">--°C</div>
-    <div class="hora" id="hora">A aguardar dados...</div>
+    .grid { display: flex; gap: 20px; }
+    .box { flex: 1; text-align: center; }
+    .valor { font-size: 2.5rem; font-weight: bold; }
 
-    <table>
-      <thead>
-        <tr>
-          <th>Hora</th>
-          <th>Temperatura</th>
-        </tr>
-      </thead>
-      <tbody id="historico"></tbody>
-    </table>
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      margin: 10px;
+      cursor: pointer;
+    }
 
-    <script>
-      async function atualizar() {
-        const data = await fetch("/dados").then((r) => r.json());
-        if (data.length === 0) return;
+    .regar { background: #22c55e; }
+    .parar { background: #ef4444; }
 
-        const ultima = data[data.length - 1];
-        document.getElementById("valor").textContent = ultima.valor + "°C";
-        document.getElementById("hora").textContent = "às " + ultima.hora;
+    img { border-radius: 10px; margin-top: 10px; }
+    .status { font-size: 0.9rem; color: #94a3b8; margin-top: 5px; }
+  </style>
+</head>
+<body>
 
-        document.getElementById("historico").innerHTML = [...data]
-          .reverse()
-          .map((d) => `<tr><td>${d.hora}</td><td>${d.valor}°C</td></tr>`)
-          .join("");
-      }
+<h1> Irrigação Inteligente - Tomate</h1>
 
-      atualizar();
-      setInterval(atualizar, 2000);
-    </script>
-  </body>
+<div class="card grid">
+  <div class="box">
+    <div class="valor" id="temp">--°C</div>
+    <div>Temperatura</div>
+  </div>
+  <div class="box">
+    <div class="valor" id="hum">--%</div>
+    <div>Humidade</div>
+  </div>
+</div>
+
+<div class="card">
+  <canvas id="grafico"></canvas>
+</div>
+
+<div class="card">
+  <button class="regar" onclick="regar()"> Regar</button>
+  <button class="parar" onclick="parar()"> Parar</button>
+  <p class="status" id="status">Sistema parado</p>
+</div>
+
+<div class="card">
+  <h3>📷 Monitoramento</h3>
+  <img src="http://192.168.43.1:8080/video" width="100%" />
+</div>
+
+<script>
+const ctx = document.getElementById('grafico').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: { labels: [], datasets: [
+    { label: 'Temperatura', data: [], borderWidth: 2 },
+    { label: 'Humidade', data: [], borderWidth: 2 }
+  ] }
+});
+
+async function atualizar() {
+  const res = await fetch("/dados");
+  const data = await res.json();
+
+  if (data.leituras.length === 0) return;
+
+  const ultima = data.leituras[data.leituras.length - 1];
+
+  document.getElementById("temp").innerText = ultima.temperatura + "°C";
+  document.getElementById("hum").innerText = ultima.humidade + "%";
+
+  const reg_manual = data.regando_manual;
+  const reg_auto   = data.regando_auto;
+  document.getElementById("status").innerText =
+    reg_manual ? "💧 Regando Manual..." :
+    reg_auto   ? "💧 Regando Automático..." :
+                 "Sistema parado";
+
+  chart.data.labels = data.leituras.map((_, i) => i);
+  chart.data.datasets[0].data = data.leituras.map(d => d.temperatura);
+  chart.data.datasets[1].data = data.leituras.map(d => d.humidade);
+  chart.update();
+}
+
+function regar() { fetch("/regar", { method: "POST" }); }
+function parar() { fetch("/parar", { method: "POST" }); }
+
+setInterval(atualizar, 2000);
+</script>
+</body>
 </html>
